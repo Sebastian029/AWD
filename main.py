@@ -6,7 +6,7 @@ model = YOLO("yolov8n.pt")
 # Trening modelu na Twoim datasetcie
 # data.yaml - plik konfiguracyjny datasetu
 # epochs - liczba epok trenowania
-results = model.train(data="data.yaml", epochs=1, imgsz=640)
+results = model.train(data="data.yaml", epochs=10, imgsz=640)
 
 # Testowanie na zbiorze walidacyjnym (automatycznie zdefiniowanym w data.yaml)
 metrics = model.val()
