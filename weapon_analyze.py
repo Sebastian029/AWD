@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import albumentations as A
 from tqdm import tqdm
 
-
 DATASET_ROOT = "weapon_detection"
 TRAIN_IMAGES = os.path.join(DATASET_ROOT, "train", "images")
 TRAIN_LABELS = os.path.join(DATASET_ROOT, "train", "labels")
@@ -58,7 +57,6 @@ def validate_labels(image_dir, label_dir):
             continue
 
 
-
 def analyze_class_distribution(image_dir, dataset_name="Dataset"):
     class_counter = Counter()
 
@@ -70,7 +68,6 @@ def analyze_class_distribution(image_dir, dataset_name="Dataset"):
         class_name = filename.split('_')[0]
         class_counter[class_name] += 1
         total_images += 1
-
 
     plt.figure(figsize=(12, 6))
     classes = list(class_counter.keys())
@@ -90,116 +87,128 @@ def analyze_class_distribution(image_dir, dataset_name="Dataset"):
     return class_counter
 
 
-def create_augmentation_pipeline():
-    transform = A.Compose([
-        A.OneOf([
-            A.Rotate(limit=15, p=1.0),  # Obrót ±15 stopni
-            A.Rotate(limit=30, p=1.0),  # Obrót ±30 stopni
-        ], p=0.5),
+def compare_dataset_sizes(original_dir, augmented_dir):
+    """
+    Porównuje liczbę obrazów przed i po augmentacji.
+    """
+    # Policz pliki
+    original_count = len(list(Path(original_dir).glob("*.jpeg")))
+    augmented_count = len(list(Path(augmented_dir).glob("*.jpeg")))
 
-        A.OneOf([
-            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.15, rotate_limit=0, p=1.0),  # Przesunięcie i skalowanie
-            A.HorizontalFlip(p=1.0),  # Odbicie poziome
-        ], p=0.5),
+    # Przygotuj dane do wykresu
+    categories = ['Przed augmentacją', 'Po augmentacji']
+    counts = [original_count, augmented_count]
+    colors = ['#3498db', '#2ecc71']
 
-        A.OneOf([
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=1.0),  # Jasność/kontrast
-            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=20, p=1.0),  # Kolor
-            A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=1.0),  # Przesunięcie RGB
-        ], p=0.5),
+    # Stwórz wykres
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(categories, counts, color=colors, width=0.6, edgecolor='black', linewidth=1.5)
 
-        A.OneOf([
-            A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),  # Szum gaussowski
-            A.GaussianBlur(blur_limit=(3, 5), p=1.0),  # Rozmycie gaussowskie
-        ], p=0.3),
+    # Dodaj wartości na słupkach
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2., height,
+                 f'{int(height)}',
+                 ha='center', va='bottom', fontsize=14, fontweight='bold')
 
-    ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
+    # Oblicz i wyświetl wzrost
+    increase = augmented_count - original_count
+    increase_percent = (increase / original_count) * 100
 
-    return transform
+    plt.ylabel('Liczba obrazów', fontsize=12, fontweight='bold')
+    plt.title(f'Porównanie wielkości datasetu\nWzrost: +{increase} obrazów (+{increase_percent:.1f}%)',
+              fontsize=14, fontweight='bold')
+    plt.ylim(0, augmented_count * 1.15)
+    plt.grid(axis='y', alpha=0.3, linestyle='--')
+    plt.tight_layout()
 
+    # Zapisz wykres
+    output_filename = 'dataset_size_comparison.png'
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    print(f"\n✓ Wykres porównania zapisany jako: {output_filename}")
+    print(f"✓ Przed augmentacją: {original_count} obrazów")
+    print(f"✓ Po augmentacji: {augmented_count} obrazów")
+    print(f"✓ Wzrost: +{increase} obrazów (+{increase_percent:.1f}%)")
 
-def read_yolo_labels(label_path):
-    bboxes = []
-    class_labels = []
-
-    if os.path.exists(label_path):
-        with open(label_path, 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                if len(parts) == 5:
-                    class_id = int(parts[0])
-                    #bbox = list(map(float, parts[1:]))
-                    bbox = [float(x) for x in parts[1:]]
-                    class_labels.append(class_id)
-                    bboxes.append(bbox)
-
-    return bboxes, class_labels
-
-
-def save_yolo_labels(label_path, bboxes, class_labels):
-    with open(label_path, 'w') as f:
-        for bbox, class_id in zip(bboxes, class_labels):
-            x_center, y_center, width, height = bbox
-            f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+    plt.close()
 
 
-def augment_dataset(image_dir, label_dir, output_image_dir, output_label_dir, num_augmentations=3):
+def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_dir, num_augmentations=3):
     os.makedirs(output_image_dir, exist_ok=True)
     os.makedirs(output_label_dir, exist_ok=True)
 
-    # Skopiuj oryginalne dane
-    print("\nKopiowanie oryginalnych danych...")
-    image_files = list(Path(image_dir).glob("*.jpg")) + list(Path(image_dir).glob("*.png"))
+    # Prosty pipeline - tylko podstawowe augmentacje
+    transform = A.Compose([
+        # OBRÓT
+        A.Rotate(limit=30, p=0.5),
 
-    for img_path in tqdm(image_files, desc="Kopiowanie"):
-        # Kopiuj obraz
+        # SKALOWANIE I PRZESUNIĘCIE
+        A.ShiftScaleRotate(
+            shift_limit=0.1,  # Przesunięcie ±10%
+            scale_limit=0.2,  # Skalowanie ±20%
+            rotate_limit=0,  # Obrót wyłączony (mamy osobno)
+            p=0.5
+        ),
+
+        # ZMIANA KOLORU
+        A.ColorJitter(
+            brightness=0.2,  # Jasność
+            contrast=0.2,  # Kontrast
+            saturation=0.2,  # Nasycenie
+            hue=0.1,  # Odcień
+            p=0.5
+        ),
+
+        # SZUM GAUSSOWSKI
+        A.GaussNoise(
+            var_limit=(10.0, 50.0),
+            p=0.3
+        ),
+
+    ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
+
+    # Pobierz listę obrazów
+    image_files = list(Path(image_dir).glob("*.jpeg"))
+    augmented_count = 0
+
+    print(f"\nPrzetwarzanie {len(image_files)} obrazów...")
+
+    for img_path in tqdm(image_files, desc="Augmentacja"):
         shutil.copy(img_path, os.path.join(output_image_dir, img_path.name))
-
-        # Kopiuj etykietę
         label_path = Path(label_dir) / f"{img_path.stem}.txt"
         if label_path.exists():
             shutil.copy(label_path, os.path.join(output_label_dir, label_path.name))
 
-    # Pipeline augmentacji
-    transform = create_augmentation_pipeline()
+        image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
 
-    print(f"\nGenerowanie augmentowanych danych...")
-    augmented_count = 0
-
-    for img_path in tqdm(image_files, desc="Augmentacja"):
-        # Wczytaj obraz
-        image = cv2.imread(str(img_path))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # Wczytaj etykiety
-        label_path = Path(label_dir) / f"{img_path.stem}.txt"
-        bboxes, class_labels = read_yolo_labels(label_path)
+        bboxes, class_labels = [], []
+        if label_path.exists():
+            with open(label_path, 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) == 5:
+                        class_labels.append(int(parts[0]))
+                        bboxes.append([float(x) for x in parts[1:]])
 
         if len(bboxes) == 0:
             continue
 
-        # Wykonaj num_augmentations augmentacji
         for aug_idx in range(num_augmentations):
             try:
-                # Zastosuj augmentację
                 augmented = transform(image=image, bboxes=bboxes, class_labels=class_labels)
-                aug_image = augmented['image']
-                aug_bboxes = augmented['bboxes']
-                aug_class_labels = augmented['class_labels']
 
-                if len(aug_bboxes) == 0:
+                if len(augmented['bboxes']) == 0:
                     continue
 
-                # Zapisz augmentowany obraz
                 aug_img_name = f"{img_path.stem}_aug_{aug_idx}{img_path.suffix}"
                 aug_img_path = os.path.join(output_image_dir, aug_img_name)
-                aug_image_bgr = cv2.cvtColor(aug_image, cv2.COLOR_RGB2BGR)
-                cv2.imwrite(aug_img_path, aug_image_bgr)
+                cv2.imwrite(aug_img_path, cv2.cvtColor(augmented['image'], cv2.COLOR_RGB2BGR))
 
-                # Zapisz augmentowane etykiety
-                aug_label_name = f"{img_path.stem}_aug_{aug_idx}.txt"
-                aug_label_path = os.path.join(output_label_dir, aug_label_name)
-                save_yolo_labels(aug_label_path, aug_bboxes, aug_class_labels)
+                aug_label_path = os.path.join(output_label_dir, f"{img_path.stem}_aug_{aug_idx}.txt")
+                with open(aug_label_path, 'w') as f:
+                    for bbox, class_id in zip(augmented['bboxes'], augmented['class_labels']):
+                        x_center, y_center, width, height = bbox
+                        f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
 
                 augmented_count += 1
 
@@ -225,25 +234,22 @@ def main():
     print("\n[KROK 3/6] Analiza rozkładu klas treningowych...")
     train_distribution = analyze_class_distribution(TRAIN_IMAGES, "Train Set")
 
-    # WSTĘPNA OBRÓBKA - VAL
     print("\n[KROK 4/6] Walidacja danych walidacyjnych...")
     validate_images(VAL_IMAGES, VAL_LABELS)
     validate_labels(VAL_IMAGES, VAL_LABELS)
     val_distribution = analyze_class_distribution(VAL_IMAGES, "Validation Set")
 
-    # 2. AUGMENTACJA
     print("\n[KROK 5/6] Augmentacja danych treningowych...")
-    augment_dataset(
+    augment_yolo_dataset(
         image_dir=TRAIN_IMAGES,
         label_dir=TRAIN_LABELS,
         output_image_dir=AUGMENTED_TRAIN_IMAGES,
         output_label_dir=AUGMENTED_TRAIN_LABELS,
-        num_augmentations=3  # Każdy obraz x3 augmentacje
+        num_augmentations=3
     )
 
-
-
-
+    print("\n[KROK 6/6] Porównanie wielkości datasetu przed i po augmentacji...")
+    compare_dataset_sizes(TRAIN_IMAGES, AUGMENTED_TRAIN_IMAGES)
 
 
 if __name__ == "__main__":
