@@ -1,0 +1,7 @@
+﻿path: ./weapon_detection
+
+train: train_augmented/images
+val: val/images
+
+nc: 9
+names: ['Automatic Rifle', 'Bazooka', 'Grenade Launcher', 'Handgun', 'Knife', 'Shotgun', 'SMG', 'Sniper', 'Sword']

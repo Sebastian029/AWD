@@ -1,22 +1,58 @@
 ﻿from ultralytics import YOLO
+import pandas as pd
+import json
 
-# Załaduj model (np. YOLOv8n - najmniejszy dostępny model do szybkiego trenowania)
-model = YOLO("yolov8n.pt")
+# Lista eksperymentów do przetestowania
+experiments = [
+    {"model": "yolov8n.pt", "epochs": 20, "imgsz": 640, "batch": 32},
+    {"model": "yolov8s.pt", "epochs": 20, "imgsz": 640, "batch": 32},
+    {"model": "yolov8n.pt", "epochs": 20, "imgsz": 800, "batch": 16},
+    {"model": "yolov8n.pt", "epochs": 20, "imgsz": 640, "batch": 64},
+]
 
-# Trening modelu na Twoim datasetcie
-# data.yaml - plik konfiguracyjny datasetu
-# epochs - liczba epok trenowania
-results = model.train(data="data.yaml", epochs=10, imgsz=640)
 
-# Testowanie na zbiorze walidacyjnym (automatycznie zdefiniowanym w data.yaml)
-metrics = model.val()
+results_data = []
 
-# Detekcja na pojedynczym obrazie (ścieżka lub URL)
-results = model("weapon_detection/val/images/Automatic Rifle_9.jpeg")
+for idx, exp in enumerate(experiments):
+    print(f"\n=== Experiment {idx + 1}/{len(experiments)} ===")
+    print(f"Config: {exp}")
 
-# Wyświetlanie wyników detekcji (np. bounding box + label)
-for result in results:
-    result.show()
+    model = YOLO(exp["model"])
 
-# Zapis modelu wytrenowanego do pliku (opcjonalnie)
-model.save("yolo_weapon_detection_trained.pt")
+    results = model.train(
+        data="data.yaml",
+        epochs=exp["epochs"],
+        imgsz=exp["imgsz"],
+        batch=exp["batch"],
+        name=f"exp_{idx}",
+        save=True,
+        plots=True
+    )
+
+    metrics = model.val()
+
+    experiment_results = {
+        "experiment": idx,
+        "model_name": exp["model"],
+        "epochs": exp["epochs"],
+        "imgsz": exp["imgsz"],
+        "batch": exp["batch"],
+        "mAP50": metrics.box.map50,
+        "mAP50-95": metrics.box.map,
+        "precision": metrics.box.p.mean(),
+        "recall": metrics.box.r.mean(),
+        "f1": 2 * (metrics.box.p.mean() * metrics.box.r.mean()) / (metrics.box.p.mean() + metrics.box.r.mean()),
+    }
+
+    results_data.append(experiment_results)
+
+    #model.save(f"weapon_detection_exp_{idx}.pt")
+
+df = pd.DataFrame(results_data)
+df.to_csv("yolo_experiments_comparison.csv", index=False)
+print("\n=== Summary ===")
+print(df)
+
+best_model = df.loc[df['mAP50-95'].idxmax()]
+print(f"\nBest model: Experiment {best_model['experiment']}")
+print(best_model)
