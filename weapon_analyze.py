@@ -7,7 +7,6 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 import albumentations as A
-from tqdm import tqdm
 
 DATASET_ROOT = "weapon_detection"
 TRAIN_IMAGES = os.path.join(DATASET_ROOT, "train", "images")
@@ -123,7 +122,7 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
     augmented_counter = Counter()
     sample_images = []
 
-    for img_path in tqdm(image_files, desc="Augmentacja"):
+    for img_path in  image_files:
         shutil.copy(img_path, os.path.join(output_image_dir, img_path.name))
         label_path = Path(label_dir) / f"{img_path.stem}.txt"
         if label_path.exists():

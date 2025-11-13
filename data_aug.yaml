@@ -1,6 +1,6 @@
 ﻿path: ./weapon_detection
 
-train: train/images
+train: train_augmented/images
 val: val/images
 
 nc: 9
