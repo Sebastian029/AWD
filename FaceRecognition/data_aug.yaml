@@ -1,0 +1,7 @@
+﻿path: ./dataset
+
+train: train_augmented/images
+val: images/valid
+
+nc: 2
+names: ['No Mask', 'Mask']

@@ -1,0 +1,225 @@
+﻿import os
+import shutil
+from pathlib import Path
+from collections import Counter
+import cv2
+from PIL import Image
+import matplotlib.pyplot as plt
+import numpy as np
+import albumentations as A
+
+DATASET_ROOT = "dataset"
+TRAIN_IMAGES = os.path.join(DATASET_ROOT, "images", "train")
+TRAIN_LABELS = os.path.join(DATASET_ROOT, "labels", "train")
+VAL_IMAGES = os.path.join(DATASET_ROOT, "images", "val")
+VAL_LABELS = os.path.join(DATASET_ROOT, "labels", "val")
+
+AUGMENTED_TRAIN_IMAGES = os.path.join(DATASET_ROOT, "train_augmented", "images")
+AUGMENTED_TRAIN_LABELS = os.path.join(DATASET_ROOT, "train_augmented", "labels")
+
+NUM_CLASSES = 2
+CLASS_NAMES = ['No Mask', 'Mask']
+
+
+def validate_images(image_dir, label_dir):
+    corrupted_files = []
+    image_files = (
+            list(Path(image_dir).glob("*.jpeg")) +
+            list(Path(image_dir).glob("*.jpg")) +
+            list(Path(image_dir).glob("*.png"))
+    )
+
+    for img_path in image_files:
+        try:
+            img = Image.open(img_path)
+            img.verify()
+        except Exception as e:
+            corrupted_files.append(img_path)
+            img_path.unlink()
+            label_path = Path(label_dir) / f"{img_path.stem}.txt"
+            if label_path.exists():
+                label_path.unlink()
+            print(f"{img_path.name}")
+
+    if corrupted_files:
+        print(f"{len(corrupted_files)}")
+    return corrupted_files
+
+
+def validate_labels(image_dir, label_dir):
+    invalid_labels = []
+    image_files = (list(Path(image_dir).glob("*.jpeg")) +
+                   list(Path(image_dir).glob("*.jpg")) +
+                   list(Path(image_dir).glob("*.png")))
+
+    for img_path in image_files:
+        label_path = Path(label_dir) / f"{img_path.stem}.txt"
+        if not label_path.exists():
+            print(f"{img_path.name}")
+            invalid_labels.append(img_path)
+            img_path.unlink()
+
+    return invalid_labels
+
+
+def analyze_class_distribution_from_labels(label_dir, dataset_name="Dataset"):
+    class_counter = Counter()
+
+    label_files = list(Path(label_dir).glob("*.txt"))
+    for label_path in label_files:
+        with open(label_path, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) != 5:
+                    continue
+                class_id = int(parts[0])
+                if 0 <= class_id < len(CLASS_NAMES):
+                    class_name = CLASS_NAMES[class_id]
+                else:
+                    class_name = f"class_{class_id}"
+                class_counter[class_name] += 1
+
+    plot_bar_chart(class_counter, dataset_name)
+    plot_pie_chart(class_counter, dataset_name)
+
+    return class_counter
+
+
+def plot_bar_chart(class_counter, dataset_name):
+    plt.figure(figsize=(12, 6))
+    classes = sorted(class_counter.keys())
+    counts = [class_counter[c] for c in classes]
+
+    plt.bar(classes, counts, color='#3498db', edgecolor='black', linewidth=1.5)
+    plt.xlabel('Klasa', fontsize=12, fontweight='bold')
+    plt.ylabel('Liczba obrazów', fontsize=12, fontweight='bold')
+    plt.title(f'Rozkład klas - {dataset_name}', fontsize=14, fontweight='bold')
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', alpha=0.3, linestyle='--')
+    plt.tight_layout()
+
+    output_filename = f'bar_chart_{dataset_name.lower().replace(" ", "_")}.png'
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    print(f"✓ Wykres słupkowy: {output_filename}")
+    plt.close()
+
+
+def plot_pie_chart(class_counter, dataset_name):
+    plt.figure(figsize=(10, 8))
+    classes = sorted(class_counter.keys())
+    counts = [class_counter[c] for c in classes]
+    colors = plt.cm.Set3(np.linspace(0, 1, len(classes)))
+
+    plt.pie(counts, labels=classes, autopct='%1.1f%%', startangle=90,
+            colors=colors, textprops={'fontsize': 10})
+    plt.title(f'Rozkład klas - {dataset_name}', fontsize=14, fontweight='bold')
+    plt.tight_layout()
+
+    output_filename = f'pie_chart_{dataset_name.lower().replace(" ", "_")}.png'
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_dir, num_augmentations=3):
+    os.makedirs(output_image_dir, exist_ok=True)
+    os.makedirs(output_label_dir, exist_ok=True)
+
+    transform = A.Compose([
+        A.Rotate(limit=30, p=0.5),
+        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=0, p=0.5),
+        A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2, p=0.5),
+        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+    ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
+
+    image_files = (
+            list(Path(image_dir).glob("*.jpeg")) +
+            list(Path(image_dir).glob("*.jpg")) +
+            list(Path(image_dir).glob("*.png"))
+    )
+    print("Wejściowe obrazy do augmentacji:", len(image_files))
+
+    valid_labeled = 0
+    for img_path in image_files:
+        label_path = Path(label_dir) / f"{img_path.stem}.txt"
+        if label_path.exists():
+            valid_labeled += 1
+    print("Obrazy z etykietami:", valid_labeled)
+
+    augmented_counter = Counter()
+
+    for img_path in image_files:
+        shutil.copy(img_path, os.path.join(output_image_dir, img_path.name))
+        label_path = Path(label_dir) / f"{img_path.stem}.txt"
+        if label_path.exists():
+            shutil.copy(label_path, os.path.join(output_label_dir, label_path.name))
+
+        image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
+        bboxes, class_labels = [], []
+
+        if label_path.exists():
+            with open(label_path, 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) == 5:
+                        class_id = int(parts[0])
+                        class_labels.append(class_id)
+                        bboxes.append([float(x) for x in parts[1:]])
+
+        if len(bboxes) == 0:
+            continue
+
+        # ZLICZAJ WSZYSTKIE ORYGINALNE OBIEKTY
+        for class_id in class_labels:
+            augmented_counter[CLASS_NAMES[class_id]] += 1
+
+        # Augmentacja
+        for aug_idx in range(num_augmentations):
+            try:
+                augmented = transform(image=image, bboxes=bboxes, class_labels=class_labels)
+                if len(augmented['bboxes']) == 0:
+                    continue
+
+                aug_img_name = f"{img_path.stem}_aug_{aug_idx}{img_path.suffix}"
+                aug_img_path = os.path.join(output_image_dir, aug_img_name)
+                cv2.imwrite(aug_img_path, cv2.cvtColor(augmented['image'], cv2.COLOR_RGB2BGR))
+
+                aug_label_path = os.path.join(output_label_dir, f"{img_path.stem}_aug_{aug_idx}.txt")
+                with open(aug_label_path, 'w') as f:
+                    for bbox, class_id in zip(augmented['bboxes'], augmented['class_labels']):
+                        x_center, y_center, width, height = bbox
+                        class_id = int(class_id)
+                        f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+
+                # ZLICZAJ WSZYSTKIE AUGMENTOWANE OBIEKTY
+                for class_id in augmented['class_labels']:
+                    augmented_counter[CLASS_NAMES[int(class_id)]] += 1
+
+            except Exception as e:
+                print(f"{img_path.name}: {e}")
+
+    print("Rozkład klas po augmentacji (bboxy):")
+    for class_name, count in augmented_counter.most_common():
+        print(f"  {class_name}: {count}")
+
+    return augmented_counter, []
+
+
+def main():
+    validate_images(TRAIN_IMAGES, TRAIN_LABELS)
+    validate_labels(TRAIN_IMAGES, TRAIN_LABELS)
+
+    analyze_class_distribution_from_labels(TRAIN_LABELS, "Train Set (Przed augmentacją)")
+
+    augment_yolo_dataset(
+        image_dir=TRAIN_IMAGES,
+        label_dir=TRAIN_LABELS,
+        output_image_dir=AUGMENTED_TRAIN_IMAGES,
+        output_label_dir=AUGMENTED_TRAIN_LABELS,
+        num_augmentations=3
+    )
+
+    analyze_class_distribution_from_labels(AUGMENTED_TRAIN_LABELS, "Train Set (Po augmentacji)")
+
+
+if __name__ == "__main__":
+    main()
