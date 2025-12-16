@@ -9,9 +9,9 @@ class SimpleYOLOTrainer:
 
     def run(self):
         grid = {
-            'data': ['face_data.yaml','data_aug.yaml'],
+            'data': ['face_data.yaml'],
             'model': ['yolo11n.pt'],
-            'epochs': [20],
+            'epochs': [5],
             'optimizer': ['SGD'],
             'lr0': [0.01],
         }
@@ -57,6 +57,7 @@ class SimpleYOLOTrainer:
                     lr0=config['lr0'],
                     optimizer=config['optimizer'],
                     verbose=False,
+                    patience=10,  # Early stopping po 10 epok bez poprawy
                     **aug_params,
                     **run_common
                 )

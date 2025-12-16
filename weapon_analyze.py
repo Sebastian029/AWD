@@ -111,59 +111,88 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
     os.makedirs(output_image_dir, exist_ok=True)
     os.makedirs(output_label_dir, exist_ok=True)
 
-    transform = A.Compose([
-        A.Rotate(limit=30, p=0.5),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=0, p=0.5),
-        A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2, p=0.5),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
-    ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
+    transform = A.Compose(
+        [
+            A.Rotate(limit=30, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=0, p=0.5),
+            A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2, p=0.5),
+            A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+        ],
+        bbox_params=A.BboxParams(
+            format="yolo",
+            label_fields=["class_labels"],
+            min_visibility=0.3,
+        ),
+    )
 
-    image_files = list(Path(image_dir).glob("*.jpeg")) + list(Path(image_dir).glob("*.png"))
+    image_files = list(Path(image_dir).glob("*.jpg")) \
+                 + list(Path(image_dir).glob("*.jpeg")) \
+                 + list(Path(image_dir).glob("*.png"))
+
     augmented_counter = Counter()
     sample_images = []
 
-    for img_path in  image_files:
+    for img_path in image_files:
+        # skopiuj oryginał
         shutil.copy(img_path, os.path.join(output_image_dir, img_path.name))
         label_path = Path(label_dir) / f"{img_path.stem}.txt"
         if label_path.exists():
             shutil.copy(label_path, os.path.join(output_label_dir, label_path.name))
 
+        # wczytaj obraz
         image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
 
-        bboxes, class_labels = [], []
+        # wczytaj bboxy i klasy
+        bboxes = []
+        class_labels = []
         if label_path.exists():
-            with open(label_path, 'r') as f:
+            with open(label_path, "r") as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) == 5:
-                        class_labels.append(int(parts[0]))
-                        bboxes.append([float(x) for x in parts[1:]])
+                    if len(parts) != 5:
+                        continue
+                    class_id = int(parts[0])             # <-- klasa jako int
+                    x, y, w, h = map(float, parts[1:])   # <-- bbox jako floaty
+                    class_labels.append(class_id)
+                    bboxes.append([x, y, w, h])
 
         if len(bboxes) == 0:
             continue
 
-        class_name = img_path.stem.split('_')[0]
+        class_name = img_path.stem.split("_")[0]
 
         for aug_idx in range(num_augmentations):
             try:
-                augmented = transform(image=image, bboxes=bboxes, class_labels=class_labels)
+                augmented = transform(
+                    image=image,
+                    bboxes=bboxes,
+                    class_labels=class_labels,
+                )
 
-                if len(augmented['bboxes']) == 0:
+                if len(augmented["bboxes"]) == 0:
                     continue
 
+                # zapis obrazu
                 aug_img_name = f"{img_path.stem}_aug_{aug_idx}{img_path.suffix}"
                 aug_img_path = os.path.join(output_image_dir, aug_img_name)
-                cv2.imwrite(aug_img_path, cv2.cvtColor(augmented['image'], cv2.COLOR_RGB2BGR))
+                cv2.imwrite(
+                    aug_img_path,
+                    cv2.cvtColor(augmented["image"], cv2.COLOR_RGB2BGR),
+                )
 
-                aug_label_path = os.path.join(output_label_dir, f"{img_path.stem}_aug_{aug_idx}.txt")
-                with open(aug_label_path, 'w') as f:
-                    for bbox, class_id in zip(augmented['bboxes'], augmented['class_labels']):
+                # zapis labeli
+                aug_label_path = os.path.join(
+                    output_label_dir, f"{img_path.stem}_aug_{aug_idx}.txt"
+                )
+                with open(aug_label_path, "w") as f:
+                    for bbox, class_id in zip(augmented["bboxes"], augmented["class_labels"]):
                         x_center, y_center, width, height = bbox
-                        f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
+                        f.write(
+                            f"{int(class_id)} "
+                            f"{x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n"
+                        )
 
                 augmented_counter[class_name] += 1
-
-
 
             except Exception as e:
                 print(f"{img_path.name}: {e}")

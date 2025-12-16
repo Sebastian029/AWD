@@ -86,7 +86,7 @@ def fix_yolo_labels(directory, mapping):
 if __name__ == "__main__":
     # Ustawienia
     METADATA_FILE = 'metadata.csv'  # Ścieżka do Twojego pliku metadata
-    LABELS_DIR = os.path.join('weapon_detection', 'train', 'labels')
+    LABELS_DIR = os.path.join('weapon_detection', 'val', 'labels')
 
     # Uruchomienie
     class_mapping = load_metadata(METADATA_FILE)

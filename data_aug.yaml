@@ -4,4 +4,13 @@ train: train_augmented/images
 val: val/images
 
 nc: 9
-names: ['Automatic Rifle', 'Bazooka', 'Grenade Launcher', 'Handgun', 'Knife', 'Shotgun', 'SMG', 'Sniper', 'Sword']
+names:
+  0: Automatic Rifle
+  1: Bazooka
+  2: Grenade Launcher
+  3: Handgun
+  4: Knife
+  5: Shotgun
+  6: SMG
+  7: Sniper
+  8: Sword
