@@ -2,108 +2,142 @@
 import pandas as pd
 from ultralytics import YOLO
 import itertools
+import shutil
+import os
 
 
 class SimpleYOLOTrainer:
-    def __init__(self):
-        self.results = []
 
     def run(self):
         grid = {
-            'data': ['data.yaml', 'data_aug.yaml'],
-            'model': ['yolov11n.pt', 'yolov11m.pt'],
+            'data': ['data.yaml', 'data_aug.yaml', 'data_raw.yaml'],
+            'model': ['yolo11m.pt', 'yolo11n.pt'],
             'epochs': [100],
-            'batch': [16, 32],
+            'batch': [16],
             'optimizer': ['SGD', 'AdamW'],
             'lr0': [0.01, 0.001],
         }
+
 
         keys = list(grid.keys())
         values = list(grid.values())
 
         run_common = dict(
-            save=False,
+            save=True,
             plots=False,
             save_txt=False,
             save_json=False,
             save_conf=False,
             save_crop=False,
             save_period=-1,
-            project='.',
-            name='',
-            exist_ok=True,
-            save_dir='./'
+            project='temp_runs',
+            exist_ok=True
         )
 
         exp_id = 0
+        csv_filename = 'results.csv'
+
+        # Iteracja po gridzie
         for combo in itertools.product(*values):
             exp_id += 1
             config = dict(zip(keys, combo))
 
-            print(f"\n[{exp_id}] Konfiguracja: {config['data']} | Model: {config['model']}")
+            # Unikalna nazwa folderu dla każdego runa (ważne!)
+            run_name = f"exp_{exp_id}"
 
-            # 2. LOGIKA STEROWANIA AUGMENTACJĄ
+            print(f"\n[{exp_id}] Konfiguracja: {config['data']} | Model: {config['model']} | {config['optimizer']}")
+
             aug_params = {}
+            data_file_name = config['data']  # np. 'data_raw.yaml'
+            aug_info_str = "UNKNOWN"
 
-            # Jeśli w nazwie pliku jest 'aug' (czyli data_aug.yaml) -> WYŁĄCZAMY augmentację YOLO
-            if 'aug' in config['data']:
-                print("   -> Wykryto pre-augmentowane dane. Wyłączam augmentację YOLO.")
-                aug_params = {
-                    'hsv_h': 0, 'hsv_s': 0, 'hsv_v': 0,
-                    'degrees': 0, 'translate': 0, 'scale': 0,
-                    'shear': 0, 'perspective': 0,
-                    'flipud': 0, 'fliplr': 0,
-                    'mosaic': 0, 'mixup': 0,
-                    'copy_paste': 0, 'erasing': 0
-                }
+            # Parametry wyłączające augmentację w YOLO
+            disable_yolo_aug = {
+                'degrees': 0.0, 'translate': 0.0, 'scale': 0.0,
+                'shear': 0.0, 'perspective': 0.0, 'flipud': 0.0,
+                'fliplr': 0.0, 'hsv_h': 0.0, 'hsv_s': 0.0,
+                'hsv_v': 0.0, 'mosaic': 0.0, 'mixup': 0.0,
+                'copy_paste': 0.0, 'erasing': 0.0, 'auto_augment': None
+            }
+
+            if 'aug' in data_file_name:
+                # 1. data_aug.yaml -> Twoja augmentacja (Albumentations)
+                print("   -> Wykryto 'aug'. Wyłączam augmentację YOLO.")
+                aug_params = disable_yolo_aug
+                aug_info_str = "Custom (Albumentations)"
+
+            elif 'raw' in data_file_name:
+                # 2. data_raw.yaml -> Brak augmentacji (Baseline)
+                print("   -> Wykryto 'raw'. Wyłączam augmentację YOLO.")
+                aug_params = disable_yolo_aug
+                aug_info_str = "None (Raw Baseline)"
+
             else:
-                # Jeśli to zwykły plik (data.yaml) -> Pusty słownik = Domyślna augmentacja YOLO włączona
-                print("   -> Wykryto czyste dane. Używam wewnętrznej augmentacji YOLO.")
+                # 3. data.yaml -> Standardowa augmentacja YOLO
+                print("   -> Standard. Używam augmentacji YOLO.")
                 aug_params = {}
+                aug_info_str = "YOLO Internal"
 
             model = YOLO(config['model'])
             start = time.time()
 
             try:
-                # Przekazujemy **aug_params rozpakowane do funkcji train
+                # TRENING
                 model.train(
                     data=config['data'],
                     epochs=config['epochs'],
                     imgsz=640,
-                    batch=16,
+                    batch=config['batch'],  # Używam batcha z gridu
                     lr0=config['lr0'],
                     optimizer=config['optimizer'],
-                    patience= 10,
+                    patience=10,
                     verbose=False,
+                    name=run_name,  # Przypisanie unikalnej nazwy
                     **aug_params,
                     **run_common
                 )
-
+                best_epoch_idx = getattr(model.trainer, 'epoch', -1)
                 train_time = time.time() - start
 
-                metrics = model.val(data=config['data'], split='val', save=False, plots=False, save_dir='./')
+                # WALIDACJA (teraz zadziała, bo best.pt istnieje w temp_runs/exp_X)
+                metrics = model.val(
+                    data=config['data'],
+                    split='val',
+                    save=False,
+                    plots=False
+                )
 
-                self.results.append({
+                # ZBIERANIE WYNIKU
+                result = {
                     'exp_id': exp_id,
                     'data': config['data'],
                     'model': config['model'],
-                    'epochs': config['epochs'],
+                    'best_epoch': best_epoch_idx,
                     'optimizer': config['optimizer'],
                     'lr0': config['lr0'],
-                    'augmentation': 'OFF (Custom Data)' if aug_params else 'ON (YOLO Internal)',
+                    'augmentation_type': aug_info_str,  # <--- TUTAJ ZMIANA
                     'test_mAP50': float(metrics.box.map50),
                     'test_mAP50-95': float(metrics.box.map),
                     'test_precision': float(metrics.box.p.mean()),
                     'test_recall': float(metrics.box.r.mean()),
                     'fitness': float(metrics.fitness),
                     'time_min': train_time / 60
-                })
+                }
 
-                df = pd.DataFrame(self.results).sort_values('test_mAP50-95', ascending=False)
-                df.to_csv('results.csv', index=False)
+                # ZAPIS DO CSV (TRYB APPEND - Dopisuje na bieżąco)
+                df = pd.DataFrame([result])
+                write_header = not os.path.exists(csv_filename)
+                df.to_csv(csv_filename, mode='a', header=write_header, index=False)
 
                 print(f"✅ mAP: {metrics.box.map:.3f} | {train_time / 60:.1f}min")
                 print("📁 Zapisano: results.csv")
+
+                # SPRZĄTANIE PO SOBIE (Usuwamy folder z wagami)
+                # Dzięki temu zachowujesz się jakby save=False, ale bez błędów walidacji
+                run_dir = os.path.join('temp_runs', run_name)
+                if os.path.exists(run_dir):
+                    shutil.rmtree(run_dir)
+                print("🧹 Wyczyszczono pliki tymczasowe.")
 
             except Exception as e:
                 print(f"❌ Błąd treningu: {e}")

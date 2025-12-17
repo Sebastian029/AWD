@@ -1,0 +1,16 @@
+﻿path: ./weapon_detection
+
+train: train/images
+val: val/images
+
+nc: 9
+names:
+  0: Automatic Rifle
+  1: Bazooka
+  2: Grenade Launcher
+  3: Handgun
+  4: Knife
+  5: Shotgun
+  6: SMG
+  7: Sniper
+  8: Sword
