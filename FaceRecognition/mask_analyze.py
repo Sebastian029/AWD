@@ -168,11 +168,9 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
         if len(bboxes) == 0:
             continue
 
-        # ZLICZAJ WSZYSTKIE ORYGINALNE OBIEKTY
         for class_id in class_labels:
             augmented_counter[CLASS_NAMES[class_id]] += 1
 
-        # Augmentacja
         for aug_idx in range(num_augmentations):
             try:
                 augmented = transform(image=image, bboxes=bboxes, class_labels=class_labels)
@@ -190,7 +188,6 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
                         class_id = int(class_id)
                         f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
 
-                # ZLICZAJ WSZYSTKIE AUGMENTOWANE OBIEKTY
                 for class_id in augmented['class_labels']:
                     augmented_counter[CLASS_NAMES[int(class_id)]] += 1
 

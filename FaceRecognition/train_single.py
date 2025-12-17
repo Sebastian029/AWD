@@ -4,7 +4,7 @@ from ultralytics import YOLO
 
 def main():
     # --- KONFIGURACJA ZWYCIĘSKA ---
-    DATA_YAML = "data.yaml"
+    DATA_YAML = "face_data.yaml"
     MODEL_WEIGHTS = "yolo11m.pt"
     EPOCHS = 200
     BATCH = 16

@@ -133,16 +133,13 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
     sample_images = []
 
     for img_path in image_files:
-        # skopiuj oryginał
         shutil.copy(img_path, os.path.join(output_image_dir, img_path.name))
         label_path = Path(label_dir) / f"{img_path.stem}.txt"
         if label_path.exists():
             shutil.copy(label_path, os.path.join(output_label_dir, label_path.name))
 
-        # wczytaj obraz
         image = cv2.cvtColor(cv2.imread(str(img_path)), cv2.COLOR_BGR2RGB)
 
-        # wczytaj bboxy i klasy
         bboxes = []
         class_labels = []
         if label_path.exists():
@@ -151,8 +148,8 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
                     parts = line.strip().split()
                     if len(parts) != 5:
                         continue
-                    class_id = int(parts[0])             # <-- klasa jako int
-                    x, y, w, h = map(float, parts[1:])   # <-- bbox jako floaty
+                    class_id = int(parts[0])
+                    x, y, w, h = map(float, parts[1:])
                     class_labels.append(class_id)
                     bboxes.append([x, y, w, h])
 
@@ -172,7 +169,6 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
                 if len(augmented["bboxes"]) == 0:
                     continue
 
-                # zapis obrazu
                 aug_img_name = f"{img_path.stem}_aug_{aug_idx}{img_path.suffix}"
                 aug_img_path = os.path.join(output_image_dir, aug_img_name)
                 cv2.imwrite(
@@ -180,7 +176,6 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
                     cv2.cvtColor(augmented["image"], cv2.COLOR_RGB2BGR),
                 )
 
-                # zapis labeli
                 aug_label_path = os.path.join(
                     output_label_dir, f"{img_path.stem}_aug_{aug_idx}.txt"
                 )
@@ -198,8 +193,6 @@ def augment_yolo_dataset(image_dir, label_dir, output_image_dir, output_label_di
                 print(f"{img_path.name}: {e}")
 
     return augmented_counter, sample_images
-
-
 
 
 def main():

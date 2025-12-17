@@ -2,6 +2,7 @@
 
 train: train/images
 val: val/images
+test:
 
 nc: 9
 names:

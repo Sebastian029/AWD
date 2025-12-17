@@ -37,21 +37,16 @@ class SimpleYOLOTrainer:
         exp_id = 0
         csv_filename = 'results.csv'
 
-        # Iteracja po gridzie
         for combo in itertools.product(*values):
             exp_id += 1
             config = dict(zip(keys, combo))
 
-            # Unikalna nazwa folderu dla każdego runa (ważne!)
             run_name = f"exp_{exp_id}"
 
-            print(f"\n[{exp_id}] Konfiguracja: {config['data']} | Model: {config['model']} | {config['optimizer']}")
-
             aug_params = {}
-            data_file_name = config['data']  # np. 'data_raw.yaml'
+            data_file_name = config['data']
             aug_info_str = "UNKNOWN"
 
-            # Parametry wyłączające augmentację w YOLO
             disable_yolo_aug = {
                 'degrees': 0.0, 'translate': 0.0, 'scale': 0.0,
                 'shear': 0.0, 'perspective': 0.0, 'flipud': 0.0,
@@ -61,20 +56,14 @@ class SimpleYOLOTrainer:
             }
 
             if 'aug' in data_file_name:
-                # 1. data_aug.yaml -> Twoja augmentacja (Albumentations)
-                print("   -> Wykryto 'aug'. Wyłączam augmentację YOLO.")
                 aug_params = disable_yolo_aug
                 aug_info_str = "Custom (Albumentations)"
 
             elif 'raw' in data_file_name:
-                # 2. data_raw.yaml -> Brak augmentacji (Baseline)
-                print("   -> Wykryto 'raw'. Wyłączam augmentację YOLO.")
                 aug_params = disable_yolo_aug
                 aug_info_str = "None (Raw Baseline)"
 
             else:
-                # 3. data.yaml -> Standardowa augmentacja YOLO
-                print("   -> Standard. Używam augmentacji YOLO.")
                 aug_params = {}
                 aug_info_str = "YOLO Internal"
 
@@ -82,24 +71,22 @@ class SimpleYOLOTrainer:
             start = time.time()
 
             try:
-                # TRENING
                 model.train(
                     data=config['data'],
                     epochs=config['epochs'],
                     imgsz=640,
-                    batch=config['batch'],  # Używam batcha z gridu
+                    batch=config['batch'],
                     lr0=config['lr0'],
                     optimizer=config['optimizer'],
                     patience=10,
                     verbose=False,
-                    name=run_name,  # Przypisanie unikalnej nazwy
+                    name=run_name,
                     **aug_params,
                     **run_common
                 )
                 best_epoch_idx = getattr(model.trainer, 'epoch', -1)
                 train_time = time.time() - start
 
-                # WALIDACJA (teraz zadziała, bo best.pt istnieje w temp_runs/exp_X)
                 metrics = model.val(
                     data=config['data'],
                     split='val',
@@ -107,7 +94,6 @@ class SimpleYOLOTrainer:
                     plots=False
                 )
 
-                # ZBIERANIE WYNIKU
                 result = {
                     'exp_id': exp_id,
                     'data': config['data'],
@@ -115,7 +101,7 @@ class SimpleYOLOTrainer:
                     'best_epoch': best_epoch_idx,
                     'optimizer': config['optimizer'],
                     'lr0': config['lr0'],
-                    'augmentation_type': aug_info_str,  # <--- TUTAJ ZMIANA
+                    'augmentation_type': aug_info_str,
                     'test_mAP50': float(metrics.box.map50),
                     'test_mAP50-95': float(metrics.box.map),
                     'test_precision': float(metrics.box.p.mean()),
@@ -124,23 +110,15 @@ class SimpleYOLOTrainer:
                     'time_min': train_time / 60
                 }
 
-                # ZAPIS DO CSV (TRYB APPEND - Dopisuje na bieżąco)
                 df = pd.DataFrame([result])
                 write_header = not os.path.exists(csv_filename)
                 df.to_csv(csv_filename, mode='a', header=write_header, index=False)
-
-                print(f"✅ mAP: {metrics.box.map:.3f} | {train_time / 60:.1f}min")
-                print("📁 Zapisano: results.csv")
-
-                # SPRZĄTANIE PO SOBIE (Usuwamy folder z wagami)
-                # Dzięki temu zachowujesz się jakby save=False, ale bez błędów walidacji
                 run_dir = os.path.join('temp_runs', run_name)
                 if os.path.exists(run_dir):
                     shutil.rmtree(run_dir)
-                print("🧹 Wyczyszczono pliki tymczasowe.")
 
             except Exception as e:
-                print(f"❌ Błąd treningu: {e}")
+                print(e)
 
 
 if __name__ == "__main__":

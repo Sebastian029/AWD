@@ -1,5 +1,4 @@
-﻿# analyze_results.py
-import pandas as pd
+﻿import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -14,14 +13,11 @@ OUT_DIR.mkdir(exist_ok=True, parents=True)
 
 def load_data(path=CSV_PATH):
     df = pd.read_csv(path)
-    # Uporządkuj nazwy kolumn (czasem różne separatory)
     df.columns = [c.strip() for c in df.columns]
-    # Typy liczbowe
     num_cols = ["epochs", "lr0", "test_mAP50", "test_mAP50-95", "test_precision", "test_recall", "time_min"]
     for c in num_cols:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
-    # Porządkuj kategorie
     for c in ["model", "optimizer", "data", "augmentation"]:
         if c in df.columns:
             df[c] = df[c].astype("category")
@@ -42,7 +38,6 @@ def summarize_overall(df):
 
 def group_stats(df, by, metrics=("test_mAP50-95","test_mAP50","test_precision","test_recall","time_min")):
     g = df.groupby(by, dropna=False)[list(metrics)].agg(["mean","std","count"]).reset_index()
-    # Spłaszcz kolumny MultiIndex
     g.columns = ["_".join([c for c in col if c]) if isinstance(col, tuple) else col for col in g.columns]
     save_table(g, f"group_{'_'.join(by)}")
     return g
