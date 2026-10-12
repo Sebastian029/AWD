@@ -1,7 +1,7 @@
 """Evaluate trained weights on a chosen split and print per-class AP.
 
     python src/evaluate.py --task masks   --split test
-    python src/evaluate.py --task weapons --split val --data configs/weapons/data_clean.yaml
+    python src/evaluate.py --task weapons --split val --weights path/to/best.pt
 """
 import argparse
 
