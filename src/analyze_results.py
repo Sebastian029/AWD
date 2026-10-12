@@ -1,10 +1,16 @@
-"""Plots comparing grid-search results (results/combined.csv -> results/plots/)."""
+"""Plots comparing grid-search results (results/*_grid.csv -> results/plots/).
+
+NOTE: weapons grid results were measured on a val split where 77/143 images are copies of train images,
+so absolute weapons numbers are inflated; see src/check_dataset.py.
+"""
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+from combine_results import combine
 
 CSV_PATH = Path("results/combined.csv")
 OUT_DIR = Path("results/plots")
@@ -19,8 +25,7 @@ def load_data(path=CSV_PATH):
     df = pd.read_csv(path)
     df.columns = [c.strip() for c in df.columns]
     df["Aug_Short"] = df["augmentation_type"].replace(AUG_SHORT)
-    # best_epoch in the old CSVs is the epoch where training stopped, not the best one
-    return df.rename(columns={"best_epoch": "stopped_epoch"})
+    return df
 
 
 def save_plot(name):
@@ -32,11 +37,12 @@ def save_plot(name):
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    combine()  # always rebuild combined.csv from the per-task CSVs
     df = load_data()
     print(f"{len(df)} runs loaded")
 
-    baseline = df[df["Aug_Short"] == "None"].groupby("dataset_name")["test_mAP50-95"].mean()
-    df["Aug_Gain"] = df["test_mAP50-95"] - df["dataset_name"].map(baseline).fillna(0)
+    baseline = df[df["Aug_Short"] == "None"].groupby("dataset_name")["val_mAP50-95"].mean()
+    df["Aug_Gain"] = df["val_mAP50-95"] - df["dataset_name"].map(baseline).fillna(0)
 
     plt.figure(figsize=(10, 6))
     ax = sns.barplot(data=df[df["Aug_Short"] != "None"], x="dataset_name", y="Aug_Gain", hue="Aug_Short",
@@ -49,7 +55,7 @@ def main():
     save_plot("1_augmentation_gain_delta")
 
     plt.figure(figsize=(8, 6))
-    sns.boxplot(data=df, x="dataset_name", y="test_mAP50-95", hue="Aug_Short", palette="Set2")
+    sns.boxplot(data=df, x="dataset_name", y="val_mAP50-95", hue="Aug_Short", palette="Set2")
     plt.title("mAP50-95 distribution per dataset")
     save_plot("2_dataset_distribution")
 
@@ -60,12 +66,12 @@ def main():
     save_plot("3_fitness_score_ranking")
 
     plt.figure(figsize=(10, 6))
-    sns.boxplot(data=df, x="optimizer", y="test_mAP50-95", hue="lr0", palette="Set2")
+    sns.boxplot(data=df, x="optimizer", y="val_mAP50-95", hue="lr0", palette="Set2")
     plt.title("Optimizer stability: spread of mAP50-95")
     save_plot("4_optimizer_stability")
 
     plt.figure(figsize=(10, 7))
-    sns.scatterplot(data=df, x="time_min", y="test_mAP50-95", hue="Aug_Short", style="model",
+    sns.scatterplot(data=df, x="time_min", y="val_mAP50-95", hue="Aug_Short", style="model",
                     size="stopped_epoch", sizes=(50, 200), alpha=0.8, palette="deep")
     plt.title("Efficiency: training time vs mAP50-95")
     plt.xlabel("Training time (min)")

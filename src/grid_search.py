@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 from ultralytics import YOLO
 
-from common import config_path
+from common import config_path, require_data
 
 GRID = {
     "variant": ["data", "data_aug", "data_raw"],
@@ -38,9 +38,11 @@ AUG_MODES = {
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--seed", type=int, default=0, help="training seed; repeat with different seeds to estimate noise")
     ap.add_argument("--out", help="results CSV (default: results/<task>_grid.csv)")
     args = ap.parse_args()
 
+    require_data(args.task)
     csv_path = Path(args.out or f"results/{args.task}_grid.csv")
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     runs_dir = Path("temp_runs")
@@ -49,6 +51,7 @@ def main():
         cfg = dict(zip(GRID.keys(), combo))
         data = str(config_path(args.task, cfg["variant"]))
         aug_label, aug_params = AUG_MODES[cfg["variant"]]
+        val_split = "val_clean" if args.task == "weapons" else "valid"
         run_name = f"{args.task}_exp_{exp_id}"
         print(f"\n[{exp_id}] {data} | {cfg['model']} | {cfg['optimizer']} | lr0={cfg['lr0']} | aug={aug_label}")
 
@@ -58,24 +61,21 @@ def main():
             model.train(
                 data=data, epochs=EPOCHS, imgsz=IMGSZ, batch=BATCH,
                 lr0=cfg["lr0"], optimizer=cfg["optimizer"], patience=PATIENCE,
-                verbose=False, plots=False, name=run_name, project=str(runs_dir), exist_ok=True,
+                verbose=False, plots=False, seed=args.seed, name=run_name, project=str(runs_dir), exist_ok=True,
                 **aug_params,
             )
             train_time = time.time() - start
-            # epoch with the best fitness (trainer.epoch is only where training stopped)
-            stopper = getattr(model.trainer, "stopper", None)
-            best_epoch = getattr(stopper, "best_epoch", getattr(model.trainer, "epoch", -1))
+            stopped_epoch = getattr(model.trainer, "epoch", -1)
+            best_epoch = getattr(getattr(model.trainer, "stopper", None), "best_epoch", -1)
 
             m = model.val(data=data, split="val", save=False, plots=False)
             row = {
                 "exp_id": exp_id, "data": data, "model": cfg["model"],
-                "best_epoch": best_epoch, "optimizer": cfg["optimizer"], "lr0": cfg["lr0"],
+                "seed": args.seed, "best_epoch": best_epoch, "stopped_epoch": stopped_epoch, "optimizer": cfg["optimizer"], "lr0": cfg["lr0"],
                 "augmentation_type": aug_label,
-                # NOTE: metrics come from the val split (no separate test split yet);
-                # column names kept as `test_*` for compatibility with the existing CSVs.
-                "test_mAP50": float(m.box.map50), "test_mAP50-95": float(m.box.map),
-                "test_precision": float(m.box.p.mean()), "test_recall": float(m.box.r.mean()),
-                "fitness": float(m.fitness), "time_min": train_time / 60,
+                "val_mAP50": float(m.box.map50), "val_mAP50-95": float(m.box.map),
+                "val_precision": float(m.box.mp), "val_recall": float(m.box.mr),
+                "fitness": float(m.fitness), "time_min": train_time / 60, "val_split": val_split,
             }
             pd.DataFrame([row]).to_csv(csv_path, mode="a", header=not csv_path.exists(), index=False)
         except Exception:
