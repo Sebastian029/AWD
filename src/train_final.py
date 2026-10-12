@@ -15,7 +15,7 @@ MODEL, EPOCHS, BATCH, OPTIMIZER, LR0, PATIENCE = "yolo11m.pt", 200, 16, "SGD", 0
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--task", choices=["weapons", "masks"], default="weapons")
     args = ap.parse_args()
 
     require_data(args.task)

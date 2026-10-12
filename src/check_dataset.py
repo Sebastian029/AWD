@@ -49,7 +49,7 @@ def check_filename_vs_label(names, image_dir, label_dir, split):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--task", choices=["weapons", "masks"], default="weapons")
     ap.add_argument("--max-dist", type=int, default=4,
                     help="max Hamming distance (of 64 bits) to call two images near-duplicates")
     args = ap.parse_args()

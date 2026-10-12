@@ -1,10 +1,14 @@
-"""Plots comparing grid-search results (results/*_grid.csv -> results/plots/).
+"""Plots comparing grid-search results.
+
+    python src/analyze_results.py                         # weapons only -> results/plots/weapons/
+    python src/analyze_results.py --tasks weapons masks   # joint comparison -> results/plots/joint/
 
 Caveats: every grid cell is a single run (no repeated seeds); YOLO-internal runs often reach the 100-epoch cap
 while the others early-stop at ~30-60 epochs, so augmentation and training length are confounded.
 NOTE: weapons grid results were measured on a val split where 77/143 images are copies of train images,
 so absolute weapons numbers are inflated; see src/check_dataset.py.
 """
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -12,9 +16,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from combine_results import combine
+from common import TASKS
 
-CSV_PATH = Path("results/combined.csv")
 OUT_DIR = Path("results/plots")
 
 plt.rcParams.update({"figure.dpi": 150, "font.size": 11, "axes.titlesize": 14, "axes.labelsize": 12})
@@ -23,9 +26,13 @@ sns.set_theme(style="whitegrid", context="notebook", palette="muted")
 AUG_SHORT = {"Custom (Albumentations)": "Custom", "None (Raw Baseline)": "None", "YOLO Internal": "YOLO"}
 
 
-def load_data(path=CSV_PATH):
-    df = pd.read_csv(path)
-    df.columns = [c.strip() for c in df.columns]
+def load_data(tasks):
+    frames = []
+    for name in tasks:
+        df = pd.read_csv(f"results/{name}_grid.csv")
+        df["dataset_name"] = TASKS[name]["label"]
+        frames.append(df)
+    df = pd.concat(frames, ignore_index=True)
     df["Aug_Short"] = df["augmentation_type"].replace(AUG_SHORT)
     return df
 
@@ -38,9 +45,13 @@ def save_plot(name):
 
 
 def main():
+    global OUT_DIR
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--tasks", nargs="+", choices=list(TASKS), default=["weapons"])
+    args = ap.parse_args()
+    OUT_DIR = Path("results/plots") / ("joint" if len(args.tasks) > 1 else args.tasks[0])
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    combine()  # always rebuild combined.csv from the per-task CSVs
-    df = load_data()
+    df = load_data(args.tasks)
     print(f"{len(df)} runs loaded")
 
     # Best run of the grid per augmentation: means are dominated by diverged runs (e.g. AdamW, lr0=0.01).

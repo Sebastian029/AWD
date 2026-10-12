@@ -12,7 +12,7 @@ from common import config_path
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--task", choices=["weapons", "masks"], default="weapons")
     ap.add_argument("--split", choices=["val", "test"], default="test")
     ap.add_argument("--weights", help="default: runs/<task>/final_yolo11m/weights/best.pt")
     ap.add_argument("--data", help="default: configs/<task>/data.yaml")

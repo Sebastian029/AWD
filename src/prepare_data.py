@@ -127,7 +127,7 @@ def augment_dataset(image_dir, label_dir, out_image_dir, out_label_dir, n_aug=NU
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--task", choices=["weapons", "masks"], default="weapons")
     ap.add_argument("--delete-invalid", action="store_true",
                     help="delete corrupted images / images without labels (default: only report)")
     args = ap.parse_args()

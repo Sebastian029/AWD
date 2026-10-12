@@ -8,6 +8,8 @@ os.chdir(REPO_ROOT)  # configs use paths relative to the repo root, so scripts w
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png")
 
+# "weapons" is the main task of this repo; "masks" is the second half of the shared (two-person) project
+# and was done by the project partner.
 TASKS = {
     "weapons": {
         "root": Path("data/weapons"),
@@ -22,7 +24,7 @@ TASKS = {
         "kaggle": "https://www.kaggle.com/datasets/snehilsanyal/weapon-detection-test",
         "layout": "data/weapons/{train,val}/{images,labels}",
     },
-    "masks": {
+    "masks": {  # shared project part (partner)
         "root": Path("data/masks"),
         "train_images": "images/train",
         "train_labels": "labels/train",

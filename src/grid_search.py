@@ -37,7 +37,7 @@ AUG_MODES = {
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--task", choices=["weapons", "masks"], required=True)
+    ap.add_argument("--task", choices=["weapons", "masks"], default="weapons")
     ap.add_argument("--seed", type=int, default=0, help="training seed; repeat with different seeds to estimate noise")
     ap.add_argument("--out", help="results CSV (default: results/<task>_grid.csv)")
     args = ap.parse_args()
