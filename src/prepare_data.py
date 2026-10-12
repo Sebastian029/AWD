@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-from common import get_task, list_images
+from common import get_task, list_images, require_data
 
 PLOTS_DIR = Path("results/plots")
 NUM_AUGMENTATIONS = 3
@@ -132,6 +132,7 @@ def main():
                     help="delete corrupted images / images without labels (default: only report)")
     args = ap.parse_args()
 
+    require_data(args.task)
     t = get_task(args.task)
     root = t["root"]
     train_images, train_labels = root / t["train_images"], root / t["train_labels"]
