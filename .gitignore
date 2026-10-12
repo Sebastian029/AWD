@@ -14,3 +14,4 @@ runs/**/weights/
 
 # stray early test run
 runs/*/interrupted_run/
+runs/*/_old_leaky_val/

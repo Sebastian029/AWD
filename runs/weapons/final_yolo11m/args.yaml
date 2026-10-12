@@ -1,7 +1,7 @@
 task: detect
 mode: train
 model: yolo11m.pt
-data: data.yaml
+data: configs\weapons\data.yaml
 epochs: 200
 time: null
 patience: 10
@@ -12,9 +12,9 @@ save_period: -1
 cache: false
 device: null
 workers: 8
-project: final_training
-name: yolo11m_weapons_best
-exist_ok: false
+project: runs/weapons
+name: final_yolo11m
+exist_ok: true
 pretrained: true
 optimizer: SGD
 verbose: true
@@ -103,4 +103,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: C:\Users\iwans\PycharmProjects\awd\final_training\yolo11m_weapons_best
+save_dir: C:\Users\iwans\PycharmProjects\awd\runs\weapons\final_yolo11m

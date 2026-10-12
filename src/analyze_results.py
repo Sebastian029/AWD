@@ -1,5 +1,7 @@
 """Plots comparing grid-search results (results/*_grid.csv -> results/plots/).
 
+Caveats: every grid cell is a single run (no repeated seeds); YOLO-internal runs often reach the 100-epoch cap
+while the others early-stop at ~30-60 epochs, so augmentation and training length are confounded.
 NOTE: weapons grid results were measured on a val split where 77/143 images are copies of train images,
 so absolute weapons numbers are inflated; see src/check_dataset.py.
 """
@@ -41,15 +43,17 @@ def main():
     df = load_data()
     print(f"{len(df)} runs loaded")
 
-    baseline = df[df["Aug_Short"] == "None"].groupby("dataset_name")["val_mAP50-95"].mean()
-    df["Aug_Gain"] = df["val_mAP50-95"] - df["dataset_name"].map(baseline).fillna(0)
+    # Best run of the grid per augmentation: means are dominated by diverged runs (e.g. AdamW, lr0=0.01).
+    best = df.groupby(["dataset_name", "Aug_Short"])["val_mAP50-95"].max().reset_index()
+    base = best[best["Aug_Short"] == "None"].set_index("dataset_name")["val_mAP50-95"]
+    best["Gain"] = best["val_mAP50-95"] - best["dataset_name"].map(base)
 
     plt.figure(figsize=(10, 6))
-    ax = sns.barplot(data=df[df["Aug_Short"] != "None"], x="dataset_name", y="Aug_Gain", hue="Aug_Short",
-                     estimator=np.mean, errorbar=None, palette=["#e74c3c", "#3498db"])
+    ax = sns.barplot(data=best[best["Aug_Short"] != "None"], x="dataset_name", y="Gain", hue="Aug_Short",
+                     palette=["#e74c3c", "#3498db"])
     plt.axhline(0, color="black", linewidth=1.5, linestyle="--")
-    plt.title("mAP gain from augmentation (relative to no augmentation)")
-    plt.ylabel("mAP50-95 delta")
+    plt.title("Best-run mAP50-95 gain from augmentation (relative to no augmentation)")
+    plt.ylabel("mAP50-95 delta (best run per group)")
     for container in ax.containers:
         ax.bar_label(container, fmt=" {:+.3f}", padding=3, fontsize=10)
     save_plot("1_augmentation_gain_delta")
@@ -60,10 +64,10 @@ def main():
     save_plot("2_dataset_distribution")
 
     plt.figure(figsize=(10, 6))
-    sns.barplot(data=df, x="model", y="fitness", hue="Aug_Short", estimator=np.mean, errorbar="sd",
+    sns.barplot(data=df, x="model", y="val_mAP50-95", hue="Aug_Short", estimator=np.mean, errorbar="sd",
                 palette="magma")
-    plt.title("Fitness score by model and augmentation")
-    save_plot("3_fitness_score_ranking")
+    plt.title("Mean mAP50-95 by model and augmentation (error bars: SD over the grid)")
+    save_plot("3_map_by_model_and_augmentation")
 
     plt.figure(figsize=(10, 6))
     sns.boxplot(data=df, x="optimizer", y="val_mAP50-95", hue="lr0", palette="Set2")
