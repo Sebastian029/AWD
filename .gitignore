@@ -1,0 +1,13 @@
+# environment / IDE
+.venv/
+.idea/
+__pycache__/
+
+# datasets (downloaded from Kaggle, see metadata/) and generated artefacts
+data/
+temp_runs/
+*.cache
+
+# model weights
+*.pt
+runs/**/weights/
