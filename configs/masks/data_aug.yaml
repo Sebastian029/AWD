@@ -2,6 +2,7 @@ path: ./data/masks
 
 train: train_augmented/images
 val: images/valid
+test: images/test
 
 nc: 2
 names: ['No Mask', 'Mask']
