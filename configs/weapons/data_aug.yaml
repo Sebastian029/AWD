@@ -1,7 +1,7 @@
 path: ./data/weapons
 
 train: train_augmented/images
-val: val/images
+val: val_clean/images
 
 nc: 9
 names:
