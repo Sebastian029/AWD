@@ -1,6 +1,6 @@
-﻿path: ./dataset
+path: ./data/masks
 
-train: images/train
+train: train_augmented/images
 val: images/valid
 
 nc: 2

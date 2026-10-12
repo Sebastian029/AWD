@@ -1,4 +1,4 @@
-﻿path: ./weapon_detection
+path: ./data/weapons
 
 train: train/images
 val: val/images
