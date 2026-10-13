@@ -47,7 +47,16 @@ def main():
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     runs_dir = Path("temp_runs")
 
+    # resume: skip experiments that are already in the CSV for this seed
+    done = set()
+    if csv_path.exists():
+        prev = pd.read_csv(csv_path)
+        done = set(prev.loc[prev["seed"] == args.seed, "exp_id"])
+        print(f"Resuming: {len(done)} experiment(s) already in {csv_path}")
+
     for exp_id, combo in enumerate(itertools.product(*GRID.values()), start=1):
+        if exp_id in done:
+            continue
         cfg = dict(zip(GRID.keys(), combo))
         data = str(config_path(args.task, cfg["variant"]))
         aug_label, aug_params = AUG_MODES[cfg["variant"]]
