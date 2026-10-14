@@ -2,7 +2,7 @@ task: detect
 mode: train
 model: yolo11m.pt
 data: configs\weapons\data.yaml
-epochs: 200
+epochs: 100
 time: null
 patience: 10
 batch: 16
