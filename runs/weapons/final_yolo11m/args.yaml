@@ -103,4 +103,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: C:\Users\iwans\PycharmProjects\awd\runs\weapons\final_yolo11m
+save_dir: runs/weapons/final_yolo11m
