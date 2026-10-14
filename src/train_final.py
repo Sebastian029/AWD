@@ -9,8 +9,8 @@ from ultralytics import YOLO
 
 from common import config_path, require_data
 
-# Winner of the grid search for both tasks.
-MODEL, EPOCHS, BATCH, OPTIMIZER, LR0, PATIENCE = "yolo11m.pt", 200, 16, "SGD", 0.001, 10
+# Winner of the grid search (same epoch budget as the grid, so the numbers are comparable).
+MODEL, EPOCHS, BATCH, OPTIMIZER, LR0, PATIENCE = "yolo11m.pt", 100, 16, "SGD", 0.001, 10
 
 
 def main():
