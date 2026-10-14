@@ -8,8 +8,9 @@ trains the best configuration and evaluates it.
 > repo) is my work. The second part, face mask detection (`--task masks`), was done by my project partner and is
 > kept here for completeness.
 
-<!-- TODO: add a demo image (output of the model on a test photo), e.g. docs/images/demo.jpg -->
-<!-- ![Demo](docs/images/demo.jpg) -->
+![Demo: Handgun detected with confidence 0.94](docs/images/demo.jpg)
+
+*Model output on one image from the cleaned validation set (`Handgun_13`, confidence 0.94).*
 
 ## Table of contents
 - [Goal](#goal)
@@ -51,8 +52,8 @@ What I did:
 
 | Model | Original val (143 images, with leakage) | `val_clean` (66 images) |
 |---|---|---|
-| mAP@50 | 0.890 | **0.805** |
-| mAP@50-95 | 0.749 | **0.654** |
+| mAP@50 | 0.902 | **0.810** |
+| mAP@50-95 | 0.770 | **0.683** |
 
 (Same trained model, evaluated twice.) The first column is shown only to illustrate the effect of the leakage.
 
@@ -66,49 +67,53 @@ What I did:
    - optimizer: SGD / AdamW
    - initial learning rate: 0.01 / 0.001
 3. **Analysis** (`analyze_results.py`): plots that compare the runs.
-4. **Final training** (`train_final.py`): the best configuration (`yolo11m`, SGD, lr 0.001), up to 200 epochs with
-   early stopping (patience 10).
+4. **Final training** (`train_final.py`): the best configuration (`yolo11m`, SGD, lr 0.001), up to 100 epochs with
+   early stopping (patience 10), the same budget as in the grid search.
 5. **Evaluation** (`evaluate.py`): metrics for each class.
 
 ## Results
 
 ### Final model (weapons)
-Evaluated on `val_clean` (66 images, 117 objects). Model: `yolo11m`, trained for 25 epochs (early stopping), 5.5 min.
+Evaluated on `val_clean` (66 images, 117 objects). Model: `yolo11m`, trained for 48 epochs (early stopping), 9.9 min on one RTX 4070 SUPER.
 
 | Metric | Value |
 |---|---|
-| mAP@50 | 0.805 |
-| mAP@50-95 | 0.654 |
-| Precision | 0.745 |
-| Recall | 0.777 |
+| mAP@50 | 0.810 |
+| mAP@50-95 | 0.683 |
+| Precision | 0.718 |
+| Recall | 0.736 |
 
 Per class (AP@50-95):
 
 | Class | AP | Class | AP | Class | AP |
 |---|---|---|---|---|---|
-| Automatic Rifle | 0.576 | Handgun | 0.730 | Sniper | 0.590 |
-| Bazooka | 0.410 | Knife | 0.780 | Sword | 0.775 |
-| Grenade Launcher | 0.686 | Shotgun | 0.548 | SMG | 0.794 |
+| Automatic Rifle | 0.506 | Handgun | 0.720 | Sniper | 0.723 |
+| Bazooka | 0.473 | Knife | 0.837 | Sword | 0.858 |
+| Grenade Launcher | 0.613 | Shotgun | 0.590 | SMG | 0.823 |
 
-The weakest classes are Bazooka, Shotgun and Automatic Rifle. Each class has only 6-9 validation images, so
+The weakest classes are Automatic Rifle and Bazooka; the best are Sword, Knife and SMG. Each class has only 6-9 validation images, so
 these per-class numbers are uncertain.
 
-<!-- Images below are produced by the final evaluation; replace with your own favourites if you like. -->
 | Predictions on validation images | Confusion matrix |
 |---|---|
 | ![Predictions](runs/weapons/final_eval/val_batch0_pred.jpg) | ![Confusion matrix](runs/weapons/final_eval/confusion_matrix_normalized.png) |
 
 ### Comparison of training settings
-<!-- TODO: fill in after re-running the grid search on val_clean (python src/grid_search.py --task weapons),
-     then python src/analyze_results.py. Use only numbers from results/weapons_grid.csv. -->
+24 training runs on `val_clean` (results in `results/weapons_grid.csv`). Best run for each data variant:
 
-| Setting | Best mAP@50-95 |
-|---|---|
-| YOLO built-in augmentation | TODO |
-| Own augmentation (Albumentations) | TODO |
-| No augmentation | TODO |
+| Data variant | Best mAP@50-95 | Best mAP@50 |
+|---|---|---|
+| YOLO built-in augmentation | **0.683** | 0.810 |
+| Own augmentation (Albumentations) | 0.653 | 0.797 |
+| No augmentation | 0.602 | 0.718 |
 
-<!-- ![Augmentation comparison](results/plots/weapons/1_augmentation_gain_delta.png) -->
+Other observations from the grid:
+- Best setup: `yolo11m` + SGD + lr 0.001 (mAP@50-95 0.683). Best `yolo11n` run: 0.626.
+- SGD with lr 0.001 was the most stable (mean 0.601). AdamW with lr 0.01 often failed to train (mean 0.180).
+- Both kinds of augmentation beat no augmentation; the built-in YOLO augmentation was better than my own pipeline
+  in this setup.
+
+![Augmentation comparison](results/plots/weapons/1_augmentation_gain_delta.png)
 
 > Note: every setting was trained once (one random seed), so small differences may be noise.
 
@@ -143,7 +148,7 @@ python -m venv .venv
 .venv\Scripts\activate          # Windows
 pip install -r requirements.txt  # for GPU training install a CUDA build of PyTorch first
 
-# 2. download the dataset from Kaggle and unpack it as
+# 2. download the dataset from Kaggle and unpack it as (pretrained YOLO weights are downloaded automatically)
 #    data/weapons/train/{images,labels} and data/weapons/val/{images,labels}
 
 # 3. prepare data
@@ -167,8 +172,10 @@ All scripts default to `--task weapons`. Use `--task masks` for the mask detecti
 - The weapons dataset is small (714 images). After cleaning, the validation set has only 66 images.
 - There is no separate test set for weapons, so results come from the validation set.
 - Every configuration in the grid search was trained once, without repeated seeds.
-- In the grid search, the built-in YOLO augmentation often trains up to the 100-epoch limit, while other variants
-  stop earlier. Training length and augmentation are therefore mixed together.
+- Runs with the built-in YOLO augmentation trained longer before early stopping (on average 57 epochs, versus 39
+  without augmentation and 26 with my own augmentation). Training length and augmentation are therefore mixed together.
+- The best configuration was chosen on the same validation set that is used to report the final result, so the result is
+  slightly optimistic.
 - The duplicate detection finds copies and resized copies. It may miss heavily edited or cropped versions.
 - The model was trained on web images; it is a study project and not a ready-to-use security system.
 
