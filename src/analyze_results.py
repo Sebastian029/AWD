@@ -5,8 +5,7 @@
 
 Caveats: every grid cell is a single run (no repeated seeds); YOLO-internal runs often reach the 100-epoch cap
 while the others early-stop at ~30-60 epochs, so augmentation and training length are confounded.
-NOTE: weapons grid results were measured on a val split where 77/143 images are copies of train images,
-so absolute weapons numbers are inflated; see src/check_dataset.py.
+Weapons runs are validated on val_clean (the Kaggle val images without a copy in train); see src/make_clean_val.py.
 """
 import argparse
 from pathlib import Path
